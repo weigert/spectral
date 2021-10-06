@@ -1,13 +1,10 @@
-#include <glm/glm.hpp>
 #include <functional>
 #include <Eigen/Dense>
 #include <complex>
 
 namespace spectral {
-
-using namespace std;
-using namespace glm;
 using namespace Eigen;
+using namespace std;
 
 #define PI 3.14159265f
 
@@ -188,7 +185,7 @@ public:
 */
 
 template<typename T>
-void leastsquares(T* basis, vector<vec2>& samples){
+void leastsquares(T* basis, vector<pair<float,float>>& samples){
 
   //Size of System
   const size_t K = basis->K;
@@ -201,11 +198,11 @@ void leastsquares(T* basis, vector<vec2>& samples){
   for(size_t j = 0; j < K; j++)
   for(size_t k = 0; k < K; k++)
   for(size_t n = 0; n < N; n++)
-    A(j,k) += basis->f(j, samples[n].x)*basis->f(k, samples[n].x);
+    A(j,k) += basis->f(j, samples[n].first)*basis->f(k, samples[n].first);
 
   for(size_t j = 0; j < K; j++)
   for(size_t n = 0; n < N; n++)
-    b(j) += basis->f(j, samples[n].x)*(samples[n].y - basis->inhom(samples[n].x));
+    b(j) += basis->f(j, samples[n].first)*(samples[n].second - basis->inhom(samples[n].first));
 
   //Solve Linear System
   JacobiSVD<MatrixXf> svd(A, ComputeThinU | ComputeThinV);
@@ -214,7 +211,7 @@ void leastsquares(T* basis, vector<vec2>& samples){
 }
 
 template<>
-void leastsquares<spectral::fourier>(spectral::fourier* basis, vector<vec2>& samples){
+void leastsquares<spectral::fourier>(spectral::fourier* basis, vector<pair<float,float>>& samples){
 
   //Size of System
   const size_t K = basis->K;
@@ -227,11 +224,11 @@ void leastsquares<spectral::fourier>(spectral::fourier* basis, vector<vec2>& sam
   for(size_t j = 0; j < 2*K+1; j++)
   for(size_t k = 0; k < 2*K+1; k++)
   for(size_t n = 0; n < N; n++)
-    A(j,k) += basis->f(j-K, samples[n].x)*basis->f(k-K, samples[n].x);
+    A(j,k) += basis->f(j-K, samples[n].first)*basis->f(k-K, samples[n].first);
 
   for(size_t j = 0; j < 2*K+1; j++)
   for(size_t n = 0; n < N; n++)
-    b(j) += basis->f(j-K, samples[n].x)*(samples[n].y - basis->inhom(samples[n].x));
+    b(j) += basis->f(j-K, samples[n].first)*(samples[n].second - basis->inhom(samples[n].first));
 
   //Solve Linear System
   JacobiSVD<MatrixXcf> svd(A, ComputeThinU | ComputeThinV);
@@ -240,7 +237,7 @@ void leastsquares<spectral::fourier>(spectral::fourier* basis, vector<vec2>& sam
 }
 
 template<typename T>
-void galerkin(T* basis, vector<vec2>& samples){
+void galerkin(T* basis, vector<pair<float,float>>& samples){
 
   //Size of System
   const size_t K = basis->K;
@@ -253,11 +250,11 @@ void galerkin(T* basis, vector<vec2>& samples){
   for(size_t j = 0; j < K; j++)
   for(size_t k = 0; k < K; k++)
   for(size_t n = 0; n < N; n++)
-    A(j,k) += basis->f(j, samples[n].x)*basis->f(k, samples[n].x);
+    A(j,k) += basis->f(j, samples[n].first)*basis->f(k, samples[n].first);
 
   for(size_t j = 0; j < K; j++)
   for(size_t n = 0; n < N; n++)
-    b(j) += basis->f(j, samples[n].x)*(samples[n].y - basis->inhom(samples[n].x));
+    b(j) += basis->f(j, samples[n].first)*(samples[n].second - basis->inhom(samples[n].first));
 
   //Solve Linear System
   JacobiSVD<MatrixXf> svd(A, ComputeThinU | ComputeThinV);
@@ -266,7 +263,7 @@ void galerkin(T* basis, vector<vec2>& samples){
 }
 
 template<typename T>
-void collocation(T* basis, vector<vec2>& samples){
+void collocation(T* basis, vector<pair<float,float>>& samples){
 
   //Size of System
   const size_t K = basis->K;
@@ -278,10 +275,10 @@ void collocation(T* basis, vector<vec2>& samples){
 
   for(size_t n = 0; n < N; n++)
   for(size_t k = 0; k < K; k++)
-    A(n,k) += basis->f(k, samples[n].x);
+    A(n,k) += basis->f(k, samples[n].first);
 
   for(size_t n = 0; n < N; n++)
-    b(n) += samples[n].y - basis->inhom(samples[n].x);
+    b(n) += samples[n].second - basis->inhom(samples[n].first);
 
   JacobiSVD<MatrixXf> svd(A, ComputeThinU | ComputeThinV);
   basis->w = svd.solve(b);
@@ -295,23 +292,23 @@ void collocation(T* basis, vector<vec2>& samples){
 ================================================================================
 */
 
-vector<vec2> sample(size_t N, pair<float, float> domain, function<float(float)> mapping){
-  vector<vec2> samples;
+vector<pair<float,float>> sample(size_t N, pair<float, float> domain, function<float(float)> mapping){
+  vector<pair<float,float>> samples;
   for(size_t n = 0; n < N; n++){
-    vec2 newsample;
-    newsample.x = domain.first + (float)n/(float)(N-1)*(domain.second - domain.first);
-    newsample.y = mapping(newsample.x);
+    pair<float,float> newsample;
+    newsample.first = domain.first + (float)n/(float)(N-1)*(domain.second - domain.first);
+    newsample.second = mapping(newsample.first);
     samples.push_back(newsample);
   }
   return samples;
 }
 
 template<typename T>
-float err(T* basis, vector<vec2>& samples){
+float err(T* basis, vector<pair<float,float>>& samples){
   float msqerr = 0.0f;
   for(auto& s: samples){
-    float ny = basis->sample(s.x);
-    msqerr += (ny-s.y)*(ny-s.y)/(float)samples.size();
+    float ny = basis->sample(s.first);
+    msqerr += (ny-s.second)*(ny-s.second)/(float)samples.size();
   }
   return msqerr;
 }

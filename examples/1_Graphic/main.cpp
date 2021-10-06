@@ -6,7 +6,7 @@ int main( int argc, char* args[] ) {
 using namespace std;
 
   //Define our Input Positions
-  std::vector<glm::vec2> samples;
+  vector<pair<float,float>> samples;
   samples = spectral::sample(50, {-2, 2}, [](float x){
     if(x > 0) return 1.0f;
     else return 0.0f;
@@ -21,7 +21,7 @@ using namespace std;
   spectral::leastsquares(&solution, samples);
 
   //Sample the Solution
-  std::vector<glm::vec2> approximations;
+  vector<pair<float,float>> approximations;
   approximations = spectral::sample(500, {-2, 2}, [&](float x){
     return solution.sample(x);
   });
@@ -44,11 +44,11 @@ using namespace std;
   approximationbuf.fill(approximations);
 
   Model samplemesh({"in_Quad"});
-  samplemesh.bind<glm::vec2>("in_Quad", &samplebuf);  //Update particle system
+  samplemesh.bind<pair<float,float>>("in_Quad", &samplebuf);  //Update particle system
   samplemesh.SIZE = samples.size();
 
   Model approximationmesh({"in_Quad"});
-  approximationmesh.bind<glm::vec2>("in_Quad", &approximationbuf);  //Update particle system
+  approximationmesh.bind<pair<float,float>>("in_Quad", &approximationbuf);  //Update particle system
   approximationmesh.SIZE = approximations.size();
 
 

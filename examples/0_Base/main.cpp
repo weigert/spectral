@@ -12,7 +12,7 @@ using namespace std;
 
   */
 
-  vector<glm::vec2> samples;
+  vector<pair<float,float>> samples;
   samples = spectral::sample(50, {-2, 2}, [](float x){
     return exp(-2.0f*x*x);
   //  if(x > 0) return 1.0f;
