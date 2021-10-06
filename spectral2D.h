@@ -8,7 +8,7 @@ using namespace std;
 
 #define PI 3.14159265f
 
-#define DN 1
+#define DN 2
 #define DM 1
 
 typedef float T;                          //Scalar-Type
@@ -66,6 +66,8 @@ public:
   }
 
 };
+
+/*
 
 class cosine: public basis {
 public:
@@ -147,6 +149,8 @@ public:
 
 };
 
+*/
+
 class fourier: public basis {
 public:
 
@@ -160,7 +164,7 @@ public:
   fourier(int _K){
     HK = _K;
     K = 2*HK+1;
-    w = VectorXcf::Zero(K);
+    w = VectorXcf::Zero(K*K);
   }
   fourier(int _K, D _domain):fourier(_K){
     domain = _domain;
@@ -169,16 +173,17 @@ public:
     inhom = _inhom;
   }
 
-  Matrix<complex<T>, DM, 1> f(int k, avec x){
+  Matrix<complex<T>, DM, 1> f(int k, float x){
     Matrix<complex<T>, DM, 1> out;
-    out << exp(1if*2.0f*PI/(domain.second-domain.first)*(float)(k-HK)*x(0));
+    out << exp(1if*2.0f*PI/(domain.second-domain.first)*(float)(k-HK)*x);
     return out;
   }
 
   bvec sample(avec x){
     bvec val = inhom(x);
-    for(int k = 0; k < K; k++)
-      val += (w(k)*f(k, x)).real();
+    for(int k1 = 0; k1 < K; k1++)
+    for(int k2 = 0; k2 < K; k2++)
+      val += (w(k1*K+k2)*f(k1, x(0))*f(k2, x(1))).real();
     return val;
   }
 
@@ -193,26 +198,35 @@ public:
 template<typename B>
 void leastsquares(B* basis, vector<S>& samples){
 
+  cout<<"Constructing Matrices"<<endl;
+
   const int K = basis->K;                 //Size of System
   const int N = samples.size();
 
-  basis->A = basis->A.Zero(K, K);         //Linear System
-  basis->b = basis->b.Zero(K);
+  basis->A = basis->A.Zero(K*K, K*K);         //Linear System
+  basis->b = basis->b.Zero(K*K);
 
-  for(int j = 0; j < K; j++)              //Fill Matrix
-  for(int k = 0; k < K; k++)
   for(int n = 0; n < N; n++)
-    basis->A(j,k) += basis->f(j, samples[n].first)(0)*basis->f(k, samples[n].first)(0);
+  for(int j1 = 0; j1 < K; j1++)              //Fill Matrix
+  for(int j2 = 0; j2 < K; j2++)              //Fill Matrix
+  for(int k1 = 0; k1 < K; k1++)
+  for(int k2 = 0; k2 < K; k2++)
+    basis->A(j1*K+j2,k1*K+k2) += basis->f(j1, samples[n].first(0))(0)*basis->f(j2, samples[n].first(1))(0)
+    *basis->f(k1, samples[n].first(0))(0)*basis->f(k2, samples[n].first(1))(0);
 
-  for(int j = 0; j < K; j++)              //Fill Vector
   for(int n = 0; n < N; n++)
-    basis->b(j) += basis->f(j, samples[n].first)(0)*(samples[n].second - basis->inhom(samples[n].first))(0);
+  for(int j1 = 0; j1 < K; j1++)              //Fill Vector
+  for(int j2 = 0; j2 < K; j2++)              //Fill Vector
+    basis->b(j1*K+j2) += basis->f(j1, samples[n].first(0))(0)*basis->f(j2, samples[n].first(1))(0)*(samples[n].second - basis->inhom(samples[n].first))(0);
+
+  cout<<"Solving Linear System"<<endl;
 
   basis->svd.compute(basis->A, ComputeThinU | ComputeThinV);
   basis->w = basis->svd.solve(basis->b);  //Solve
 
 }
 
+/*
 template<typename T>
 void galerkin(T* basis, vector<S>& samples){
 
@@ -256,6 +270,7 @@ void collocation(T* basis, vector<S>& samples){
   basis->w = basis->svd.solve(basis->b);  //Solve
 
 }
+*/
 
 /*
 ================================================================================
@@ -273,6 +288,18 @@ vector<S> sample(int N, D domain, M mapping){
   }
   return samples;
 }
+
+
+
+
+
+
+
+
+
+
+
+
 
 template<typename B>
 T err(B* basis, vector<S>& samples){

@@ -52,10 +52,10 @@ These methods are expressed as a linear system and solved using Eigen3.
 
 The library currently includes the following basis sets:
 
-- complex fourier modes
-- chebyshev polynomials
-- regular polynomials
 - cosine functions, i.e. cosine transform
+- taylor polynomials (i.e. regular polynomials)
+- chebyshev polynomials
+- complex fourier modes
 
 ## todo
 
