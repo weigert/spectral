@@ -1,6 +1,6 @@
 #include <TinyEngine/TinyEngine>
 
-#include "spectral.h"
+#include "../../spectral.h"
 
 int main( int argc, char* args[] ) {
 using namespace std;

@@ -63,6 +63,8 @@ The library currently includes the following basis sets:
 - Operator class for choosing the problem formulation
 - Domain class for transforming coordinates / testing validity
 - Better utilization of class inheritance to clean the code
+- Mean squared error output
+- Better templating
 
 ## other information
 

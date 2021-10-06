@@ -1,3 +1,4 @@
+#include <glm/glm.hpp>
 #include <functional>
 #include <Eigen/Dense>
 #include <complex>
@@ -287,9 +288,10 @@ void collocation(T* basis, vector<vec2>& samples){
 
 }
 
+
 /*
 ================================================================================
-                              Utility Methods
+                            Utility Functions
 ================================================================================
 */
 
@@ -303,5 +305,16 @@ vector<vec2> sample(size_t N, pair<float, float> domain, function<float(float)> 
   }
   return samples;
 }
+
+template<typename T>
+float err(T* basis, vector<vec2>& samples){
+  float msqerr = 0.0f;
+  for(auto& s: samples){
+    float ny = basis->sample(s.x);
+    msqerr += (ny-s.y)*(ny-s.y)/(float)samples.size();
+  }
+  return msqerr;
+}
+
 
 }
