@@ -1,5 +1,5 @@
-#include "../../spectral.h"
 #include <iostream>
+#include "../../spectral.h"
 
 int main( int argc, char* args[] ) {
 using namespace std;
@@ -12,11 +12,10 @@ using namespace std;
 
   */
 
-  vector<pair<float,float>> samples;
-  samples = spectral::sample(50, {-2, 2}, [](float x){
-    return exp(-2.0f*x*x);
-  //  if(x > 0) return 1.0f;
-  //  else return 0.0f;
+  vector<spectral::S> samples;
+  samples = spectral::sample(50, {-2, 2}, [](spectral::avec x){
+    x(0) = exp(-2.0f*x.dot(x));
+    return x;
   });
 
   /*
@@ -28,8 +27,8 @@ using namespace std;
 
   */
 
-  spectral::fourier solution(10, {-2, 2}, [](float x){
-    return 0.5f;
+  spectral::cosine solution(16, {-2, 2}, [](spectral::avec x){
+    return spectral::bvec::Zero();
   });
 
   /*

@@ -8,6 +8,22 @@ using namespace std;
 
 #define PI 3.14159265f
 
+#define DN 1
+#define DM 1
+
+typedef float T;                          //Scalar-Type
+typedef Matrix<T, DN, 1> avec;            //Vector-Type (In)
+typedef Matrix<T, DM, 1> bvec;            //Vector-Type (Out)
+typedef Matrix<T, Dynamic, 1> wvec;       //Vector-Type (Weights)
+typedef Matrix<T, DM, DN> mat;            //Matrix-Type
+
+typedef Matrix<T, Dynamic, Dynamic> XMAT; //
+typedef Matrix<T, Dynamic, 1> XVEC;       //
+
+typedef pair<T,T> D;                      //Domain
+typedef function<bvec(avec)> M;           //Mapping Function
+typedef pair<avec,bvec> S;                //Sample Point
+
 /*
 ================================================================================
                   Basis Functions Orthogonal / Non-Orthogonal
@@ -17,57 +33,53 @@ using namespace std;
 class basis {
 public:
 
-  float f(int k, float x);   //Basis Function
-  float df(int k, float x);  //Gradient of Basis Function
-  VectorXf w;                       //Basis Weights
-  size_t K = 0;                     //Number of Basis Functions
+  bvec f(int k, avec x){ return bvec::Zero(); };  //Basis Function
+  wvec w;                                                 //Basis Weights
+  size_t K = 0;                                           //Number of Basis Functions
 
   //Boundary and Domain Handling
-  function<float(float)> inhom = [](float x){ return 0.0f; };
-  pair<float, float> domain;
+  M inhom = [](avec x){ return bvec::Zero(); };
+  D domain = {-1, 1};
 
   basis(){}
   basis(size_t _K){
     K = _K;
     w = VectorXf::Zero(K);
   }
-
-  basis(size_t _K, pair<float, float> _domain):basis(_K){
+  basis(size_t _K, D _domain):basis(_K){
     domain = _domain;
   }
 
-  basis(size_t _K, pair<float, float> _domain, function<float(float)> _inhom):basis(_K, _domain){
+  basis(size_t _K, D _domain, M _inhom):basis(_K, _domain){
     inhom = _inhom;
   }
 
-  float sample(float x);
+  bvec sample(avec x){
+    bvec val = inhom(x);
+    for(int k = 0; k < K; k++)
+      val += w(k)*f(k, x);
+    return val;
+  }
 
 };
 
 class cosine: public basis {
 public:
 
-  cosine(size_t K):basis(K){}
-  cosine(size_t K, pair<float, float> _domain):cosine(K){
-    domain = _domain;
-  }
-  cosine(size_t K, pair<float, float> _domain, function<float(float)> _inhom):cosine(K, _domain){
-    inhom = _inhom;
-  }
+  cosine(size_t _K):basis(_K){}
+  cosine(size_t _K, D domain):basis(_K, domain){}
+  cosine(size_t _K, D domain, M inhom):basis(_K, domain, inhom){}
 
-  pair<float, float> domain = {-PI, PI};
+  D domain = {-PI, PI};
 
-  //Define Base Functions
-  float f(int k, float x){
-    return cos((float)k*2.0f*PI*x/(domain.second - domain.first));
+  bvec f(int k, avec x){
+    bvec out;
+    out << cos((T)k*2.0f*PI*x(0)/(domain.second - domain.first));
+    return out;
   }
 
-  float df(int k, float x){
-    return -(float)k*sin((float)k*x);
-  }
-
-  float sample(float x){
-    float val = inhom(x);
+  bvec sample(avec x){
+    bvec val = inhom(x);
     for(int k = 0; k < K; k++)
       val += w(k)*f(k, x);
     return val;
@@ -75,26 +87,22 @@ public:
 
 };
 
-class polynomial: public basis {
+class taylor: public basis {
 public:
 
-  polynomial(size_t K):basis(K){}
-  polynomial(size_t K, pair<float, float> _domain):polynomial(K){
-    domain = _domain;
-  }
-  polynomial(size_t K, pair<float, float> _domain, function<float(float)> _inhom):polynomial(K, _domain){
-    inhom = _inhom;
-  }
-  float f(int k, float x){
-    x = 2.0f*(x - domain.first)/(domain.second - domain.first) - 1.0f;
-    return pow(x, k);
-  }
-  float df(int k, float x){
-    return k*pow(x, k-1);
+  taylor(size_t _K):basis(_K){}
+  taylor(size_t _K, D domain):basis(_K, domain){}
+  taylor(size_t _K, D domain, M inhom):basis(_K, domain, inhom){}
+
+  bvec f(int k, avec x){
+    x(0) = 2.0f*(x(0) - domain.first)/(domain.second - domain.first) - 1.0f;
+    bvec out;
+    out << pow(x(0), k);
+    return out;
   }
 
-  float sample(float x){
-    float val = inhom(x);
+  bvec sample(avec x){
+    bvec val = inhom(x);
     for(int k = 0; k < K; k++)
       val += w(k)*f(k, x);
     return val;
@@ -102,6 +110,117 @@ public:
 
 };
 
+class chebyshev: public basis {
+public:
+
+  vector<function<bvec(int, avec)>> tfuncs = {
+    [](int k, avec x){ bvec out = bvec::Ones(); return out; },
+    [](int k, avec x){ bvec out = x(0)*bvec::Ones(); return out; },
+  };
+
+  void init(){
+    for(size_t j = 2; j < K; j++)
+    tfuncs.push_back([&](int k, avec x){
+      return 2.0f*x(0)*tfuncs[k-1](k-1, x) - tfuncs[k-2](k-2, x);
+    });
+  }
+
+  chebyshev(size_t _K):basis(_K){ init(); }
+  chebyshev(size_t _K, D domain):basis(_K, domain){ init(); }
+  chebyshev(size_t _K, D domain, M inhom):basis(_K, domain, inhom){ init(); }
+
+  bvec f(int k, avec x){
+    x(0) = 2.0f*(x(0) - domain.first)/(domain.second - domain.first) - 1.0f;
+    return tfuncs[k](k, x);
+  }
+
+  bvec sample(avec x){
+    bvec val = inhom(x);
+    for(int k = 0; k < K; k++)
+      val += w(k)*f(k, x);
+    return val;
+  }
+
+};
+
+/*
+================================================================================
+                    Weighted Residual Minimizing Methods
+================================================================================
+*/
+
+template<typename B>
+void leastsquares(B* basis, vector<S>& samples){
+
+  const size_t K = basis->K;          //Size of System
+  const size_t N = samples.size();
+
+  XMAT A = XMAT::Zero(K, K);          //Linear System
+  XVEC b = XVEC::Zero(K);
+
+  for(size_t j = 0; j < K; j++)       //Fill Matrix
+  for(size_t k = 0; k < K; k++)
+  for(size_t n = 0; n < N; n++)
+    A(j,k) += basis->f(j, samples[n].first)*basis->f(k, samples[n].first);
+
+  for(size_t j = 0; j < K; j++)       //Fill Vector
+  for(size_t n = 0; n < N; n++)
+    b(j) += basis->f(j, samples[n].first)*(samples[n].second - basis->inhom(samples[n].first));
+
+  JacobiSVD<MatrixXf> svd(A, ComputeThinU | ComputeThinV);
+  basis->w = svd.solve(b);            //Solve
+
+}
+
+template<typename T>
+void galerkin(T* basis, vector<S>& samples){
+
+  const size_t K = basis->K;          //Size of System
+  const size_t N = samples.size();
+
+  XMAT A = XMAT::Zero(K, K);          //Linear System
+  XVEC b = XVEC::Zero(K);
+
+  for(size_t j = 0; j < K; j++)       //Fill Matrix
+  for(size_t k = 0; k < K; k++)
+  for(size_t n = 0; n < N; n++)
+    A(j,k) += basis->f(j, samples[n].first)*basis->f(k, samples[n].first);
+
+  for(size_t j = 0; j < K; j++)       //Fill Vector
+  for(size_t n = 0; n < N; n++)
+    b(j) += basis->f(j, samples[n].first)*(samples[n].second - basis->inhom(samples[n].first));
+
+  JacobiSVD<MatrixXf> svd(A, ComputeThinU | ComputeThinV);
+  basis->w = svd.solve(b);            //Solve
+
+}
+
+template<typename T>
+void collocation(T* basis, vector<S>& samples){
+
+  const size_t K = basis->K;          //Size of System
+  const size_t N = samples.size();
+
+  XMAT A = XMAT::Zero(N, K);          //Linear System
+  XVEC b = XVEC::Zero(N);
+
+  for(size_t n = 0; n < N; n++)       //Fill Matrix
+  for(size_t k = 0; k < K; k++)
+    A(n,k) += basis->f(k, samples[n].first)(0);
+
+  for(size_t n = 0; n < N; n++)       //Fill Vector
+    b(n) += samples[n].second(0) - basis->inhom(samples[n].first)(0);
+
+  JacobiSVD<MatrixXf> svd(A, ComputeThinU | ComputeThinV);
+  basis->w = svd.solve(b);            //Solve
+
+}
+
+/*
+================================================================================
+                    Specializations for Complex Functions
+================================================================================
+*/
 
 class fourier: public basis {
 public:
@@ -112,106 +231,28 @@ public:
     K = _K;
     w = VectorXcf::Zero(2*K+1);
   }
-  fourier(size_t _K, pair<float, float> _domain):basis(_K){
+  fourier(size_t _K, D _domain):fourier(_K){
     domain = _domain;
   }
-  fourier(size_t _K, pair<float, float> _domain, function<float(float)> _inhom):basis(_K, _domain){
+  fourier(size_t _K, D _domain, M _inhom):fourier(_K, _domain){
     inhom = _inhom;
   }
 
-  complex<float> f(int k, float x){
-    return exp(1if*2.0f*PI/(domain.second-domain.first)*(float)k*x);
-  }
-  complex<float> df(int k, float x){
-    return exp(1if*2.0f*PI/(domain.second-domain.first)*(float)k*x);
+  complex<float> f(int k, avec x){
+    return exp(1if*2.0f*PI/(domain.second-domain.first)*(float)k*x(0));
   }
 
-  float sample(float x){
-    float val = inhom(x);
-    for(int k = 0; k < 2*K+1; k++){
-      val += real(w(k)*f(k-K, x));
-    }
+  bvec sample(avec x){
+    bvec val = inhom(x);
+    for(int k = 0; k < 2*K+1; k++)
+      val(0) += (w(k)*f(k-K, x)).real();
     return val;
   }
 
 };
-
-
-class chebyshev: public basis {
-public:
-
-  vector<function<float(int, float)>> tfuncs = {
-    [](int k, float x){ return 1.0f; },
-    [](int k, float x){ return x; },
-  };
-
-  chebyshev(size_t K):basis(K){
-    for(size_t j = 2; j < K; j++){
-      tfuncs.push_back([&](int k, float x){
-        return 2.0f*x*tfuncs[k-1](k-1, x) - tfuncs[k-2](k-2, x);
-      });
-    }
-  }
-
-  chebyshev(size_t K, pair<float, float> _domain):chebyshev(K){
-    domain = _domain;
-  }
-  chebyshev(size_t K, pair<float, float> _domain, function<float(float)> _inhom):chebyshev(K, _domain){
-    inhom = _inhom;
-  }
-
-  float f(int k, float x){
-    x = 2.0f*(x - domain.first)/(domain.second - domain.first) - 1.0f;
-    return tfuncs[k](k, x);
-  }
-  float df(int k, float x){
-    return tfuncs[k](k, x);
-  }
-
-  float sample(float x){
-    float val = inhom(x);
-    for(int k = 0; k < K; k++)
-      val += w(k)*f(k, x);
-    return val;
-  }
-
-};
-
-
-/*
-================================================================================
-                    Weighted Residual Minimizing Methods
-================================================================================
-*/
-
-template<typename T>
-void leastsquares(T* basis, vector<pair<float,float>>& samples){
-
-  //Size of System
-  const size_t K = basis->K;
-  const size_t N = samples.size();
-
-  //Fill Dense Linear System
-  MatrixXf A = MatrixXf::Zero(K, K);
-  VectorXf b = VectorXf::Zero(K);
-
-  for(size_t j = 0; j < K; j++)
-  for(size_t k = 0; k < K; k++)
-  for(size_t n = 0; n < N; n++)
-    A(j,k) += basis->f(j, samples[n].first)*basis->f(k, samples[n].first);
-
-  for(size_t j = 0; j < K; j++)
-  for(size_t n = 0; n < N; n++)
-    b(j) += basis->f(j, samples[n].first)*(samples[n].second - basis->inhom(samples[n].first));
-
-  //Solve Linear System
-  JacobiSVD<MatrixXf> svd(A, ComputeThinU | ComputeThinV);
-  basis->w = svd.solve(b);
-
-}
 
 template<>
-void leastsquares<spectral::fourier>(spectral::fourier* basis, vector<pair<float,float>>& samples){
+void leastsquares<spectral::fourier>(spectral::fourier* basis, vector<S>& samples){
 
   //Size of System
   const size_t K = basis->K;
@@ -228,7 +269,7 @@ void leastsquares<spectral::fourier>(spectral::fourier* basis, vector<pair<float
 
   for(size_t j = 0; j < 2*K+1; j++)
   for(size_t n = 0; n < N; n++)
-    b(j) += basis->f(j-K, samples[n].first)*(samples[n].second - basis->inhom(samples[n].first));
+    b(j) += basis->f(j-K, samples[n].first)*(samples[n].second(0) - basis->inhom(samples[n].first)(0));
 
   //Solve Linear System
   JacobiSVD<MatrixXcf> svd(A, ComputeThinU | ComputeThinV);
@@ -236,55 +277,26 @@ void leastsquares<spectral::fourier>(spectral::fourier* basis, vector<pair<float
 
 }
 
-template<typename T>
-void galerkin(T* basis, vector<pair<float,float>>& samples){
+template<>
+void collocation(spectral::fourier* basis, vector<S>& samples){
 
-  //Size of System
-  const size_t K = basis->K;
+  const size_t K = basis->K;          //Size of System
   const size_t N = samples.size();
 
-  //Fill Dense Linear System
-  MatrixXf A = MatrixXf::Zero(K, K);
-  VectorXf b = VectorXf::Zero(K);
+  MatrixXcf A = MatrixXcf::Zero(N, 2*K+1);          //Linear System
+  VectorXcf b = VectorXcf::Zero(N);
 
-  for(size_t j = 0; j < K; j++)
-  for(size_t k = 0; k < K; k++)
-  for(size_t n = 0; n < N; n++)
-    A(j,k) += basis->f(j, samples[n].first)*basis->f(k, samples[n].first);
+  for(size_t n = 0; n < N; n++)       //Fill Matrix
+  for(size_t k = 0; k < 2*K+1; k++)
+    A(n,k) += basis->f(k-K, samples[n].first);
 
-  for(size_t j = 0; j < K; j++)
-  for(size_t n = 0; n < N; n++)
-    b(j) += basis->f(j, samples[n].first)*(samples[n].second - basis->inhom(samples[n].first));
+  for(size_t n = 0; n < N; n++)       //Fill Vector
+    b(n) += samples[n].second(0) - basis->inhom(samples[n].first)(0);
 
-  //Solve Linear System
-  JacobiSVD<MatrixXf> svd(A, ComputeThinU | ComputeThinV);
-  basis->w = svd.solve(b);
+  JacobiSVD<MatrixXcf> svd(A, ComputeThinU | ComputeThinV);
+  basis->w = svd.solve(b);            //Solve
 
 }
-
-template<typename T>
-void collocation(T* basis, vector<pair<float,float>>& samples){
-
-  //Size of System
-  const size_t K = basis->K;
-  const size_t N = samples.size();
-
-  //Fill Dense Linear System
-  MatrixXf A = MatrixXf::Zero(N, K);
-  VectorXf b = VectorXf::Zero(N);
-
-  for(size_t n = 0; n < N; n++)
-  for(size_t k = 0; k < K; k++)
-    A(n,k) += basis->f(k, samples[n].first);
-
-  for(size_t n = 0; n < N; n++)
-    b(n) += samples[n].second - basis->inhom(samples[n].first);
-
-  JacobiSVD<MatrixXf> svd(A, ComputeThinU | ComputeThinV);
-  basis->w = svd.solve(b);
-
-}
-
 
 /*
 ================================================================================
@@ -292,23 +304,23 @@ void collocation(T* basis, vector<pair<float,float>>& samples){
 ================================================================================
 */
 
-vector<pair<float,float>> sample(size_t N, pair<float, float> domain, function<float(float)> mapping){
-  vector<pair<float,float>> samples;
+vector<S> sample(size_t N, D domain, M mapping){
+  vector<S> samples;
   for(size_t n = 0; n < N; n++){
-    pair<float,float> newsample;
-    newsample.first = domain.first + (float)n/(float)(N-1)*(domain.second - domain.first);
+    S newsample;
+    newsample.first(0) = domain.first + (T)n/(T)(N-1)*(domain.second - domain.first);
     newsample.second = mapping(newsample.first);
     samples.push_back(newsample);
   }
   return samples;
 }
 
-template<typename T>
-float err(T* basis, vector<pair<float,float>>& samples){
-  float msqerr = 0.0f;
+template<typename B>
+T err(B* basis, vector<S>& samples){
+  T msqerr = 0.0f;
   for(auto& s: samples){
-    float ny = basis->sample(s.first);
-    msqerr += (ny-s.second)*(ny-s.second)/(float)samples.size();
+    bvec ny = basis->sample(s.first);
+    msqerr += (ny-s.second).dot(ny-s.second)/(float)samples.size();
   }
   return msqerr;
 }

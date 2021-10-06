@@ -1,31 +1,54 @@
 #include <TinyEngine/TinyEngine>
-
 #include "../../spectral.h"
 
 int main( int argc, char* args[] ) {
 using namespace std;
 
+/*
   //Define our Input Positions
-  vector<pair<float,float>> samples;
-  samples = spectral::sample(50, {-2, 2}, [](float x){
-    if(x > 0) return 1.0f;
-    else return 0.0f;
+  vector<spectral::S> samples;
+  samples = spectral::sample(50, {-2, 2}, [](spectral::avec x){
+    x(0) = (x(0) > 0)?1.0f:0.0f;
+    return x;
   });
 
   //Construct a Cosine Representation of Samples with Inhomogeneity
-  spectral::fourier solution(11, {-2, 2}, [](float x){
-    return 0.5f;
+  spectral::fourier solution(25, {-2, 2}, [](spectral::avec x){
+    return spectral::bvec::Zero();
   });
 
   //Perform a Fit with a Weighted Resiual Method
   spectral::leastsquares(&solution, samples);
+  cout<<"MSQErr: "<<spectral::err(&solution, samples)<<endl;
 
   //Sample the Solution
-  vector<pair<float,float>> approximations;
-  approximations = spectral::sample(500, {-2, 2}, [&](float x){
+  vector<spectral::S> approximations;
+  approximations = spectral::sample(500, {-2, 2}, [&](spectral::avec x){
     return solution.sample(x);
   });
+*/
 
+  //Define our Input Positions
+  vector<spectral::S> samples;
+  samples = spectral::sample(50, {-2, 2}, [](spectral::avec x){
+    x(0) = exp(-2.0f*x.dot(x));
+    return x;
+  });
+
+  //Construct a Cosine Representation of Samples with Inhomogeneity
+  spectral::fourier solution(9, {-2, 2}, [](spectral::avec x){
+    return spectral::bvec::Zero();
+  });
+
+  //Perform a Fit with a Weighted Resiual Method
+  spectral::collocation(&solution, samples);
+  cout<<"MSQErr: "<<spectral::err(&solution, samples)<<endl;
+
+  //Sample the Solution
+  vector<spectral::S> approximations;
+  approximations = spectral::sample(500, {-2, 2}, [&](spectral::avec x){
+    return solution.sample(x);
+  });
 
 
 
