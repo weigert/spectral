@@ -4,30 +4,6 @@
 int main( int argc, char* args[] ) {
 using namespace std;
 
-/*
-  //Define our Input Positions
-  vector<spectral::S> samples;
-  samples = spectral::sample(50, {-2, 2}, [](spectral::avec x){
-    x(0) = (x(0) > 0)?1.0f:0.0f;
-    return x;
-  });
-
-  //Construct a Cosine Representation of Samples with Inhomogeneity
-  spectral::fourier solution(25, {-2, 2}, [](spectral::avec x){
-    return spectral::bvec::Zero();
-  });
-
-  //Perform a Fit with a Weighted Resiual Method
-  spectral::leastsquares(&solution, samples);
-  cout<<"MSQErr: "<<spectral::err(&solution, samples)<<endl;
-
-  //Sample the Solution
-  vector<spectral::S> approximations;
-  approximations = spectral::sample(500, {-2, 2}, [&](spectral::avec x){
-    return solution.sample(x);
-  });
-*/
-
   //Define our Input Positions
   vector<spectral::S> samples;
   samples = spectral::sample(50, {-2, 2}, [](spectral::avec x){
@@ -36,7 +12,7 @@ using namespace std;
   });
 
   //Construct a Cosine Representation of Samples with Inhomogeneity
-  spectral::fourier solution(9, {-2, 2}, [](spectral::avec x){
+  spectral::cosine solution(9, {-2, 2}, [](spectral::avec x){
     return spectral::bvec::Zero();
   });
 
@@ -49,7 +25,6 @@ using namespace std;
   approximations = spectral::sample(500, {-2, 2}, [&](spectral::avec x){
     return solution.sample(x);
   });
-
 
 
 
