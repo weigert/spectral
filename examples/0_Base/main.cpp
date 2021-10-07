@@ -16,8 +16,9 @@ using namespace std;
 
   */
 
-  vector<spectral::S> samples;
-  samples = spectral::sample(50, {-2, 2}, [](spectral::avec x){
+  spectral::domain domain = {-2, 2};
+
+  vector<spectral::S> samples = domain.sample(50, [](spectral::avec x){
     x(0) = exp(-2.0f*x.dot(x));
     return x;
   });
@@ -31,7 +32,7 @@ using namespace std;
 
   */
 
-  spectral::cosine solution(16.0f*spectral::avec::Ones(), {-2, 2}, [](spectral::avec x){
+  spectral::cosine solution(5.0f*spectral::avec::Ones(), {-2, 2}, [](spectral::avec x){
     return spectral::bvec::Zero();
   });
 
