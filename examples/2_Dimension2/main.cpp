@@ -1,7 +1,10 @@
 #include <TinyEngine/TinyEngine>
 #include <TinyEngine/camera>
 
-#include "../../spectral2D.h"
+#define DN 2
+#define DM 1
+
+#include "../../spectral.h"
 
 #include "vertexpool.h"
 
@@ -20,8 +23,15 @@ using namespace Eigen;
 
   spectral::M target = [](spectral::avec in){
     spectral::bvec out; //Input Vector
-  //  out << exp(-4.0*(in-0.5f*spectral::avec::Ones()).dot(in-0.5f*spectral::avec::Ones()));
-    out << ((in.dot(in) < 0.25f)?1.0f:0.0f);
+
+    spectral::avec shift;
+    shift << 0.3, -0.3;
+
+    float a = exp(-4.0*in.dot(in));
+//    a += 0.5f * exp(-4.0*(in+0.5f*spectral::avec::Ones()).dot(in+0.5f*spectral::avec::Ones()));
+//    a -= 0.5f * exp(-4.0*(in+shift).dot(in+shift));
+    out << a;
+  //  out << ((in.dot(in) < 0.25f)?1.0f:0.0f);
     return out;
   };
 
@@ -31,20 +41,28 @@ using namespace Eigen;
     spectral::avec in; //Input Vector
     in << i, j;
     in = in/10.0f;
-    in = in - spectral::avec::Ones();//1.0f;   //Normalize Position
+    in = in - 0.95f*spectral::avec::Ones();//1.0f;   //Normalize Position
 
     spectral::S sample(in, target(in));
     samples.push_back(sample);
 
   }
 
-  spectral::fourier solution(8, {-2, 2}, [](spectral::avec x){
+  //Asymmetric Fourier
+  spectral::avec K;
+  K << 5, 5;
+
+  spectral::cosine solution(K, {-2, 2}, [](spectral::avec x){
     return spectral::bvec::Zero();
   });
 
 
-  spectral::leastsquares(&solution, samples);
-  cout<<solution.w<<endl;
+  //cout<<solution.w.size()<<endl;
+
+  spectral::collocation(solution, samples);
+  cout<<"Err: "<<spectral::err(solution, samples)<<endl;
+//  cout<<solution.w<<endl;
+  //cout<<solution.w.size()<<endl;
 
   vector<spectral::S> approximations;
 

@@ -1,4 +1,8 @@
 #include <iostream>
+
+#define DN 1
+#define DM 1
+
 #include "../../spectral.h"
 
 int main( int argc, char* args[] ) {
@@ -27,7 +31,7 @@ using namespace std;
 
   */
 
-  spectral::cosine solution(16, {-2, 2}, [](spectral::avec x){
+  spectral::cosine solution(16.0f*spectral::avec::Ones(), {-2, 2}, [](spectral::avec x){
     return spectral::bvec::Zero();
   });
 
@@ -39,8 +43,8 @@ using namespace std;
 
   */
 
-  spectral::leastsquares(&solution, samples);
-  cout<<"MSQErr: "<<spectral::err(&solution, samples)<<endl;
+  spectral::leastsquares(solution, samples);
+  cout<<"MSQErr: "<<spectral::err(solution, samples)<<endl;
 
 	return 0;
 

@@ -1,4 +1,8 @@
 #include <TinyEngine/TinyEngine>
+
+#define DN 1
+#define DM 1
+
 #include "../../spectral.h"
 
 int main( int argc, char* args[] ) {
@@ -13,13 +17,13 @@ using namespace std;
   });
 
   //Construct a Cosine Representation of Samples with Inhomogeneity
-  spectral::fourier solution(25, {-2, 2}, [](spectral::avec x){
+  spectral::fourier solution(25.0f*spectral::avec::Ones(), {-2, 2}, [](spectral::avec x){
     return spectral::bvec::Zero();
   });
 
   //Perform a Fit with a Weighted Resiual Method
-  spectral::collocation(&solution, samples);
-  cout<<"MSQErr: "<<spectral::err(&solution, samples)<<endl;
+  spectral::collocation(solution, samples);
+  cout<<"MSQErr: "<<spectral::err(solution, samples)<<endl;
 
   //Sample the Solution
   vector<spectral::S> approximations;
