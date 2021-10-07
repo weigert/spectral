@@ -8,76 +8,38 @@
 
 #include "vertexpool.h"
 
-#define SIZEX 20
-#define SIZEY 20
+#define SIZEX 40
+#define SIZEY 40
 
 int main( int argc, char* args[] ) {
 using namespace std;
 using namespace Eigen;
 
-
-
+  //Define the Problem Domain
+  spectral::domain domain = {-2, 2};
 
   //Generate Samples
-  vector<spectral::S> samples;
+  vector<spectral::S> samples = domain.sample(40, 40, [](spectral::avec in){
 
-  spectral::M target = [](spectral::avec in){
-    spectral::bvec out; //Input Vector
-
-    spectral::avec shift;
-    shift << 0.3, -0.3;
-
-    float a = exp(-4.0*in.dot(in));
-//    a += 0.5f * exp(-4.0*(in+0.5f*spectral::avec::Ones()).dot(in+0.5f*spectral::avec::Ones()));
-//    a -= 0.5f * exp(-4.0*(in+shift).dot(in+shift));
-    out << a;
-  //  out << ((in.dot(in) < 0.25f)?1.0f:0.0f);
+    spectral::bvec out;
+    out << exp(-4.0*in.dot(in));
     return out;
-  };
 
-  for(int i = 0; i < SIZEX; i++)
-  for(int j = 0; j < SIZEY; j++){
-
-    spectral::avec in; //Input Vector
-    in << i, j;
-    in = in/10.0f;
-    in = in - 0.95f*spectral::avec::Ones();//1.0f;   //Normalize Position
-
-    spectral::S sample(in, target(in));
-    samples.push_back(sample);
-
-  }
-
-  //Asymmetric Fourier
-  spectral::avec K;
-  K << 5, 5;
-
-  spectral::cosine solution(K, {-2, 2}, [](spectral::avec x){
-    return spectral::bvec::Zero();
   });
 
+  spectral::avec K;
+  K << 4, 4;
 
-  //cout<<solution.w.size()<<endl;
+  spectral::fourier solution(K, {-2, 2});
 
-  spectral::collocation(solution, samples);
+  spectral::leastsquares(solution, samples);
   cout<<"Err: "<<spectral::err(solution, samples)<<endl;
-//  cout<<solution.w<<endl;
-  //cout<<solution.w.size()<<endl;
 
-  vector<spectral::S> approximations;
+  vector<spectral::S> approximations = domain.sample(50, 50, [&](spectral::avec in){
 
-  for(int i = 0; i < 50; i++)
-  for(int j = 0; j < 50; j++){
+    return solution.sample(in);
 
-    spectral::avec in; //Input Vector
-    in << i, j;
-    in = in/25.0f;
-    in = in - spectral::avec::Ones();//1.0f;   //Normalize Position
-
-    spectral::S sample(in, solution.sample(in));
-    approximations.push_back(sample);
-
-  }
+  });
 
 
 
