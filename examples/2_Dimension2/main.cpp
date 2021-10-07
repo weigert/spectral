@@ -20,7 +20,8 @@ using namespace Eigen;
 
   spectral::M target = [](spectral::avec in){
     spectral::bvec out; //Input Vector
-    out << exp(-4.0*in.dot(in));
+  //  out << exp(-4.0*(in-0.5f*spectral::avec::Ones()).dot(in-0.5f*spectral::avec::Ones()));
+    out << ((in.dot(in) < 0.25f)?1.0f:0.0f);
     return out;
   };
 
@@ -37,7 +38,7 @@ using namespace Eigen;
 
   }
 
-  spectral::fourier solution(2, {-2, 2}, [](spectral::avec x){
+  spectral::fourier solution(8, {-2, 2}, [](spectral::avec x){
     return spectral::bvec::Zero();
   });
 

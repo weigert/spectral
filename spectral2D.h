@@ -33,7 +33,7 @@ typedef pair<avec,bvec> S;                //Sample Point
 class basis {
 public:
 
-  bvec f(int k, avec x){ return bvec::Zero(); };  //Basis Function
+  bvec f(int k, float x){ return bvec::Zero(); };  //Basis Function
   wvec w;                                                 //Basis Weights
   int K = 0;                                           //Number of Basis Functions
 
@@ -48,7 +48,7 @@ public:
   basis(){}
   basis(int _K){
     K = _K;
-    w = VectorXf::Zero(K);
+    w = VectorXf::Zero(K*K);
   }
   basis(int _K, D _domain):basis(_K){
     domain = _domain;
@@ -60,14 +60,13 @@ public:
 
   bvec sample(avec x){
     bvec val = inhom(x);
-    for(int k = 0; k < K; k++)
-      val += w(k)*f(k, x);
+    for(int k1 = 0; k1 < K; k1++)
+    for(int k2 = 0; k2 < K; k2++)
+      val += w(k1*K+k2)*f(k1, x(0))*f(k2, x(1));
     return val;
   }
 
 };
-
-/*
 
 class cosine: public basis {
 public:
@@ -78,20 +77,25 @@ public:
 
   D domain = {-PI, PI};
 
-  bvec f(int k, avec x){
-    bvec out;
-    out << cos((T)k*2.0f*PI*x(0)/(domain.second - domain.first));
+  bvec f(int k, float x){
+    Matrix<T, DM, 1> out;
+    out << cos((T)k*2.0f*PI*x/(domain.second - domain.first));
     return out;
   }
 
   bvec sample(avec x){
     bvec val = inhom(x);
-    for(int k = 0; k < K; k++)
-      val += w(k)*f(k, x);
+    for(int k1 = 0; k1 < K; k1++)
+    for(int k2 = 0; k2 < K; k2++)
+      val += w(k1*K+k2)*f(k1, x(0))*f(k2, x(1));
     return val;
   }
 
 };
+
+
+/*
+
 
 class taylor: public basis {
 public:

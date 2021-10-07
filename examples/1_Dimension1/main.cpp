@@ -7,12 +7,13 @@ using namespace std;
   //Define our Input Positions
   vector<spectral::S> samples;
   samples = spectral::sample(50, {-2, 2}, [](spectral::avec x){
-    x(0) = exp(-2.0f*x.dot(x));
+    //x(0) = exp(-2.0f*x.dot(x));
+    x(0) = (x(0) > 0)?1.0f:0.0f;//exp(-2.0f*x.dot(x));
     return x;
   });
 
   //Construct a Cosine Representation of Samples with Inhomogeneity
-  spectral::cosine solution(9, {-2, 2}, [](spectral::avec x){
+  spectral::fourier solution(25, {-2, 2}, [](spectral::avec x){
     return spectral::bvec::Zero();
   });
 
