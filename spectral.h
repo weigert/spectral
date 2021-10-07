@@ -17,18 +17,17 @@ typedef Matrix<T, DM, DN> mat;            //Matrix-Type
 typedef Matrix<T, Dynamic, Dynamic> XMAT; //
 typedef Matrix<T, Dynamic, 1> XVEC;       //
 
-typedef pair<T,T> D;                      //Domain
 typedef function<bvec(avec)> M;           //Mapping Function
 typedef pair<avec,bvec> S;                //Sample Point
 
 /*
 ================================================================================
-                    Domain Handling and Array Flattening
+                  Array Flattening and Index Management
 ================================================================================
 */
 
-int flatsize(avec DK){
-  return DK.prod();
+int flatsize(avec D){
+  return D.prod();
 }
 
 int ptoi(avec& pos, avec& dim){ //Convert Vector to Index
@@ -54,17 +53,78 @@ avec itop(int i, avec& dim){     //Convert Index to Vector
   return n;
 }
 
-vector<S> sample(int N, D domain, M mapping){
-  vector<S> samples;
-  for(int n = 0; n < N; n++){
-    S newsample;
-    newsample.first(0) = domain.first + (T)n/(T)(N-1)*(domain.second - domain.first);
-    newsample.second = mapping(newsample.first);
-    samples.push_back(newsample);
-  }
-  return samples;
-}
+/*
+================================================================================
+                    Domain Handling and Transformations
+================================================================================
+*/
 
+class domain {
+public:
+
+  avec a;
+  avec b;
+
+  domain(){}
+  domain(initializer_list<T> il){
+    vector<T> iv(il);
+    if(iv.size() < 2) cout<<"CAN'T CONSTRUCT DOMAIN"<<endl;
+    a = iv[0]*a.Ones();
+    b = iv[1]*b.Ones();
+  }
+
+  avec to(avec x, domain d){
+    x = (x - a).cwiseQuotient(b - a);     //Normalize between [0, 1]
+    return x.cwiseProduct(d.b - d.a)+d.a; //Tranform between [a, b]
+  }
+
+  avec from(avec x, domain d){
+    x = (x - d.a).cwiseQuotient(d.b - d.a); //Normalize between [0, 1]
+    return x.cwiseProduct(b - a)+a;         //Tranform between [a, b]
+  }
+
+  vector<S> sample(int N, M mapping){
+
+    vector<S> samples;
+
+    for(int n = 0; n < N; n++){
+
+      S newsample;
+      newsample.first << (float)n;
+      newsample.first = from(newsample.first, {0, (T)(N-1)});
+      newsample.second = mapping(newsample.first);
+
+      samples.push_back(newsample);
+
+    }
+    return samples;
+
+  }
+
+  vector<S> sample(int N1, int N2, M mapping){
+
+    vector<S> samples;
+
+    domain d;
+    d.a << 0, 0;
+    d.b << (T)(N1-1), (T)(N2-1);
+
+    for(int n1 = 0; n1 < N1; n1++)
+    for(int n2 = 0; n2 < N2; n2++){
+
+      S newsample;
+      newsample.first << (float)n1, (float)n2;
+      newsample.first = from(newsample.first, d);
+      newsample.second = mapping(newsample.first);
+
+      samples.push_back(newsample);
+
+    }
+    return samples;
+
+  }
+
+};
 
 /*
 ================================================================================
@@ -77,30 +137,25 @@ public:
 
   virtual bvec f(int k, avec x){ return bvec::Zero(); };  //Basis Function
 
-  avec DK;                                                //Vector of Basis Function Resolution
-  int K;                                                  //Number of Basis Functions (Total)
+  avec D;                                                //Vector of Basis Function Resolution
   wvec w;                                                 //Basis Weights
 
-  //Boundary and Domain Handling
+  //Boundary and dom Handling
   M inhom = [](avec x){ return bvec::Zero(); };
-  D domain = {-1, 1};
+  domain dom = {-1, 1};
 
   Matrix<T, Dynamic, Dynamic> A;
   Matrix<T, Dynamic, 1> b;
   JacobiSVD<Matrix<T, Dynamic, Dynamic>> svd;
 
   basis(){}
-  basis(avec _DK):DK{_DK},K{flatsize(_DK)}{}
-  basis(avec _DK, D _domain):basis(_DK){
-    domain = _domain;
-  }
-  basis(avec _DK, D _domain, M _inhom):basis(_DK, _domain){
-    inhom = _inhom;
-  }
+  basis(avec _D):D{_D}{}
+  basis(avec _D, domain _dom):basis(_D){ dom = _dom; }
+  basis(avec _D, domain _dom, M _inhom):basis(_D, _dom){ inhom = _inhom; }
 
   bvec sample(avec x){
     bvec val = inhom(x);
-    for(int k = 0; k < K; k++)
+    for(int k = 0; k < flatsize(D); k++)
       val += w(k)*f(k, x);
     return val;
   }
@@ -110,19 +165,20 @@ public:
 class cosine: public basis {
 public:
 
-  cosine(avec _DK):basis(_DK){}
-  cosine(avec _DK, D domain):basis(_DK, domain){}
-  cosine(avec _DK, D domain, M inhom):basis(_DK, domain, inhom){}
+  cosine(avec _D):basis(_D){}
+  cosine(avec _D, domain _dom):basis(_D, _dom){}
+  cosine(avec _D, domain _dom, M inhom):basis(_D, _dom, inhom){}
 
-  D domain = {-PI, PI};
+  domain dom = {-PI, PI};
 
   bvec f(int k, avec x){
 
     bvec out = bvec::Ones();  //Output Vector
-    avec _K = itop(k, DK);    //Weight Indexing
+    avec K = itop(k, D);    //Weight Indexing
 
+    x = dom.to(x, {-PI, PI});
     for(unsigned int i = 0; i < DN; i++)
-      out(0) *= cos(_K(i)*x(i)*2.0f*PI/(domain.second - domain.first));
+      out(0) *= cos(K(i)*x(i));
 
     return out;
 
@@ -134,19 +190,20 @@ public:
 class taylor: public basis {
 public:
 
-  taylor(avec _K):basis(_K){}
-  taylor(avec _K, D domain):basis(_K, domain){}
-  taylor(avec _K, D domain, M inhom):basis(_K, domain, inhom){}
+  taylor(avec _D):basis(_D){}
+  taylor(avec _D, domain _dom):basis(_D, _dom){}
+  taylor(avec _D, domain _dom, M inhom):basis(_D, _dom, inhom){}
+
+  domain dom = {-1, 1};
 
   bvec f(int k, avec x){
 
     bvec out = bvec::Ones();  //Output Vector
-    avec _K = itop(k, DK);    //Weight Indexing
+    avec K = itop(k, D);    //Weight Indexing
 
-    for(unsigned int i = 0; i < DN; i++){
-      T z = 2.0f*(x(i) - domain.first)/(domain.second - domain.first) - 1.0f;
-      out(0) *= pow(z, _K(i));
-    }
+    x = dom.to(x, {-1, 1});
+    for(unsigned int i = 0; i < DN; i++)
+      out(0) *= pow(x(i), K(i));
 
     return out;
 
@@ -164,8 +221,8 @@ private:
     [](const int k, const T x){ T out = x; return out; },
   };
 
-  void init(const avec _K){
-    for(int j = 2; j < _K.maxCoeff(); j++)
+  void init(const avec _D){
+    for(int j = 2; j < _D.maxCoeff(); j++)
     tfuncs.push_back([&](const int k, const T x){
       return 2.0f*x*tfuncs[k-1](k-1, x) - tfuncs[k-2](k-2, x);
     });
@@ -173,19 +230,20 @@ private:
 
 public:
 
-  chebyshev(avec _K):basis(_K){ init(_K); }
-  chebyshev(avec _K, D domain):basis(_K, domain){ init(_K); }
-  chebyshev(avec _K, D domain, M inhom):basis(_K, domain, inhom){ init(_K); }
+  chebyshev(avec _D):basis(_D){ init(_D); }
+  chebyshev(avec _D, domain _dom):basis(_D, _dom){ init(_D); }
+  chebyshev(avec _D, domain _dom, M inhom):basis(_D, _dom, inhom){ init(_D); }
+
+  domain dom = {-1, 1};
 
   bvec f(int k, avec x){
 
     bvec out = bvec::Ones();  //Output Vector
-    avec _K = itop(k, DK);    //Weight Indexing
+    avec K = itop(k, D);    //Weight Indexing
 
-    for(unsigned int i = 0; i < DN; i++){
-      T z = 2.0f*(x(i) - domain.first)/(domain.second - domain.first) - 1.0f;
-      out(0) *= tfuncs[_K(i)](_K(i), z);
-    }
+    x = dom.to(x, {-1, 1});
+    for(unsigned int i = 0; i < DN; i++)
+      out(0) *= tfuncs[K(i)](K(i), x(i));
 
     return out;
 
@@ -199,42 +257,42 @@ class fourier {
 public:
 
   VectorXcf w;                       //Basis Weights
-  avec HK;
-  avec DK;
-  int K;
-  D domain = {-PI, PI};
-  M inhom;
+  avec H;
+  avec D;
+
+  domain dom = {-PI, PI};
+  M inhom = [](avec x){ return bvec::Zero(); };
 
   Matrix<complex<T>, Dynamic, Dynamic> A;
   Matrix<complex<T>, Dynamic, 1> b;
   JacobiSVD<Matrix<complex<T>, Dynamic, Dynamic>> svd;
 
-  fourier(avec _DK){
-    HK = _DK;
-    DK = 2.0f*HK+avec::Ones();
-    K = flatsize(DK);      //Shift to 2D
+  fourier(avec _D){
+    H = _D;
+    D = 2.0f*H+avec::Ones();
   }
-  fourier(avec _DK, D _domain):fourier(_DK){
-    domain = _domain;
+  fourier(avec _D, domain _dom):fourier(_D){
+    dom = _dom;
   }
-  fourier(avec _DK, D _domain, M _inhom):fourier(_DK, _domain){
+  fourier(avec _D, domain _dom, M _inhom):fourier(_D, _dom){
     inhom = _inhom;
   }
 
   Matrix<complex<T>, DM, 1> f(int k, avec x){
 
     Matrix<complex<T>, DM, 1> out = Matrix<complex<T>, DM, 1>::Ones();
-    avec _K = itop(k, DK);
+    avec K = itop(k, D);
 
+    x = dom.to(x, {-PI, PI});
     for(unsigned int i = 0; i < DN; i++)
-      out(0) *= exp(1if*2.0f*PI/(domain.second-domain.first)*(_K(i)-HK(i))*x(i));
+      out(0) *= exp(1if*(K(i)-H(i))*x(i));
 
     return out;
   }
 
   bvec sample(avec x){
     bvec val = inhom(x);
-    for(int k = 0; k < K; k++)
+    for(int k = 0; k < flatsize(D); k++)
       val += (w(k)*f(k, x)).real();
     return val;
   }
@@ -250,7 +308,7 @@ public:
 template<typename B>
 void leastsquares(B& basis, const vector<S>& samples){
 
-  const int K = basis.K;                 //Size of System
+  const int K = flatsize(basis.D);       //Size of System
   const int N = samples.size();
 
   basis.A = basis.A.Zero(K, K);         //Linear System
@@ -273,7 +331,7 @@ void leastsquares(B& basis, const vector<S>& samples){
 template<typename B>
 void galerkin(B& basis, const vector<S>& samples){
 
-  const int K = basis.K;                 //Size of System
+  const int K = flatsize(basis.D);       //Size of System
   const int N = samples.size();
 
   basis.A = basis.A.Zero(K, K);         //Linear System
@@ -296,10 +354,10 @@ void galerkin(B& basis, const vector<S>& samples){
 template<typename B>
 void collocation(B& basis, const vector<S>& samples){
 
-  const int K = basis.K;                 //Size of System
+  const int K = flatsize(basis.D);       //Size of System
   const int N = samples.size();
 
-  basis.A = basis.A.Zero(N, K);         //Linear System
+  basis.A = basis.A.Zero(N, K);           //Linear System
   basis.b = basis.b.Zero(N);
 
   for(int n = 0; n < N; n++)              //Fill Matrix
